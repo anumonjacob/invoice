@@ -1,3 +1,86 @@
+Window Based application for Sales Invoice Data Entry and Invoice Print Module -2024
+
+1. Create database <TEST + YOUR NAME>
+2. Create following tables in the database
+1.) Customer
+Cust_Code	varchar (6)	Primary Key
+Cust Name	varchar (50)	Not Null
+Cust Add1	varchar (50)	Null
+Cust Add2	varchar (50)	Null
+Cust_Phone	varchar (30)	Null
+
+2.) Product
+Prod Code	varchar (6)	Primary Key
+Prod Desc	varchar (50)	Not Null
+Prod Price	Decimal (15,3)	Null, Default 0
+
+3.) Inv_Header
+Inv_No	int	Primary Key
+Inv Date	datetime	Not Null
+Inv Cust	varchar (6)	Not Null, FK (Customer->Cust_Code)
+
+4.) Inv_Detail
+Inv No	int	Primary Key
+Inv Lno	int	Primary Key
+Inv_Prod	varchar (6)	Not Null, FK (Product->Prod_Cd)
+Inv_Qty	decimal (10,3)	Not Null
+Inv_Price	decimal (15, 3)	Not Null
+
+3. Insert data from backend in Customer & Product tables.
+4. Create the project on desktop with name <TEST + YOUR NAME>
+5. Write a data entry program using VB .NET (Only Invoice Data Entry Screen)
+6. Create a SQL Query to display the Name and Total Sales invoice amount of the customer who has Maximum sales during last 6 months.
+
+Invoice Data Entry Screen Format
+
+Invoice No: 	Date: 
+
+Customer Code:	?
+Name		 :
+Address	 :
+
+Lno	Prd. Cd	Description	Unit Price	Oty	Amount
+1					
+2					
+3					
+4					
+	         Amount Total:
+
+New	Modify	Delete	Save	Cancel	Print	Query
+
+
+
+Note: Data entry should have professional look
+
+Checklist:
+a. Invoice Number must be Auto-generated.
+b. Search option should be provided to fetch existing data (Based on Invoice No.)
+c. Invoice date should not be greater than system date.
+d. For customer code selection use either combo box or a text box (Entry of new customer from frontend should be restricted). If text box is provided the provide search option to select from existing customer.
+e. Customer Name and Address should not be editable and should be fetched from Customer table.
+f. For product code selection use combo box / text box (Entry of new product from frontend should be restricted). If text box is provided the provide search option to select from existing product.
+g. Product description and Unit price should be displayed from Product table.
+h. Lno, description and Amount columns should not be editable in grid.
+i. Product code, Unit Price and Qty columns should be editable in grid.
+j. Qty should not be negative or zero.
+k. Amount will be calculated automatically after entering Qty and Unit Price. Amount Total is to be updated at same time.
+l. Preferably Ms Flex grid view /Data Grid view should be used.
+m. Control Buttons should be provided as shown in "Invoice data entry screen format".
+
+	i. New: To add a new invoice
+	ii. Modify: To edit an existing invoice
+	iii. Delete: To delete an existing invoice
+	iv. Save: To update the data in tables. Save button should be visible only in New / Modify mode
+	v. Cancel: To cancel the changes made. Cancel button should be visible in New / Modify mode. New, Modify, Delete, Print buttons should NOT be visible in New / Modify mode.
+	vi. Query: To display the Name and Total Sales invoice amount of the customer who has Maximum sales during last 6 months
+
+n. Use Message Box on "Query Button Click" to display Query Result.
+
+
+It should be professional look and the SQL should use stored procedure. VB.Net 2010 & MS SQL 2016 supported code. I need full code and also explain how to do that. Print function is not currently needed.
+
+////////////////////////////////////////////////////////////////////////////
+
 SQL scripts (create database TESTANUMONJACOB, tables, sample data).
 
 Stored procedures (insert/update/delete/get invoice, and the “max sales last 6 months” query).

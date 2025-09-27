@@ -880,3 +880,298 @@ Provide a ready-to-paste Visual Studio Designer code (the .Designer.vb snippet f
 Create a small demo dataset of invoices so you can test the Query output.
 
 If you want the designer file or I should adapt the connection string for SQL Auth / LocalDB — tell me which and I’ll produce the exact snippet for you to paste into the project.
+
+Step 1: SQL Server Database & Tables
+
+Run these scripts in SQL Server Management Studio (SSMS):
+
+-- 1. Create database
+CREATE DATABASE TESTANUMONJACOB;
+GO
+USE TESTANUMONJACOB;
+GO
+
+-- 2. Customer table
+CREATE TABLE Customer (
+    Cust_Code VARCHAR(6) PRIMARY KEY,
+    Cust_Name VARCHAR(50) NOT NULL,
+    Cust_Add1 VARCHAR(50) NULL,
+    Cust_Add2 VARCHAR(50) NULL,
+    Cust_Phone VARCHAR(30) NULL
+);
+
+-- 3. Product table
+CREATE TABLE Product (
+    Prod_Code VARCHAR(6) PRIMARY KEY,
+    Prod_Desc VARCHAR(50) NOT NULL,
+    Prod_Price DECIMAL(15,3) NULL DEFAULT 0
+);
+
+-- 4. Invoice Header
+CREATE TABLE Inv_Header (
+    Inv_No INT PRIMARY KEY,
+    Inv_Date DATETIME NOT NULL,
+    Inv_Cust VARCHAR(6) NOT NULL
+        FOREIGN KEY REFERENCES Customer(Cust_Code)
+);
+
+-- 5. Invoice Detail
+CREATE TABLE Inv_Detail (
+    Inv_No INT NOT NULL,
+    Inv_Lno INT NOT NULL,
+    Inv_Prod VARCHAR(6) NOT NULL
+        FOREIGN KEY REFERENCES Product(Prod_Code),
+    Inv_Qty DECIMAL(10,3) NOT NULL,
+    Inv_Price DECIMAL(15,3) NOT NULL,
+    PRIMARY KEY (Inv_No, Inv_Lno)
+);
+
+-- 6. Sample data
+INSERT INTO Customer VALUES
+('C001','Jacob Traders','Dubai','UAE','971-123456'),
+('C002','ABC Stores','Sharjah','UAE','971-654321');
+
+INSERT INTO Product VALUES
+('P001','Laptop',2500.000),
+('P002','Mouse',50.000),
+('P003','Keyboard',150.000),
+('P004','Monitor',600.000);
+
+Step 2: Stored Procedures
+-- Insert Invoice Header + Details
+CREATE PROCEDURE sp_InsertInvoice
+    @Inv_No INT,
+    @Inv_Date DATETIME,
+    @Inv_Cust VARCHAR(6)
+AS
+BEGIN
+    INSERT INTO Inv_Header(Inv_No, Inv_Date, Inv_Cust)
+    VALUES(@Inv_No, @Inv_Date, @Inv_Cust);
+END
+GO
+
+CREATE PROCEDURE sp_InsertInvoiceDetail
+    @Inv_No INT,
+    @Inv_Lno INT,
+    @Inv_Prod VARCHAR(6),
+    @Inv_Qty DECIMAL(10,3),
+    @Inv_Price DECIMAL(15,3)
+AS
+BEGIN
+    INSERT INTO Inv_Detail(Inv_No, Inv_Lno, Inv_Prod, Inv_Qty, Inv_Price)
+    VALUES(@Inv_No, @Inv_Lno, @Inv_Prod, @Inv_Qty, @Inv_Price);
+END
+GO
+
+-- Update Invoice Header
+CREATE PROCEDURE sp_UpdateInvoice
+    @Inv_No INT,
+    @Inv_Date DATETIME,
+    @Inv_Cust VARCHAR(6)
+AS
+BEGIN
+    UPDATE Inv_Header
+    SET Inv_Date=@Inv_Date, Inv_Cust=@Inv_Cust
+    WHERE Inv_No=@Inv_No;
+END
+GO
+
+-- Delete Invoice
+CREATE PROCEDURE sp_DeleteInvoice
+    @Inv_No INT
+AS
+BEGIN
+    DELETE FROM Inv_Detail WHERE Inv_No=@Inv_No;
+    DELETE FROM Inv_Header WHERE Inv_No=@Inv_No;
+END
+GO
+
+-- Get Invoice Header + Details
+CREATE PROCEDURE sp_GetInvoice
+    @Inv_No INT
+AS
+BEGIN
+    SELECT * FROM Inv_Header WHERE Inv_No=@Inv_No;
+    SELECT d.Inv_Lno, d.Inv_Prod, p.Prod_Desc, d.Inv_Price, d.Inv_Qty,
+           (d.Inv_Price*d.Inv_Qty) AS Amount
+    FROM Inv_Detail d
+    JOIN Product p ON d.Inv_Prod=p.Prod_Code
+    WHERE Inv_No=@Inv_No;
+END
+GO
+
+-- Query: Customer with max sales in last 6 months
+CREATE PROCEDURE sp_MaxSalesCustomer
+AS
+BEGIN
+    SELECT TOP 1 c.Cust_Name,
+           SUM(d.Inv_Qty * d.Inv_Price) AS TotalSales
+    FROM Inv_Header h
+    JOIN Inv_Detail d ON h.Inv_No=d.Inv_No
+    JOIN Customer c ON h.Inv_Cust=c.Cust_Code
+    WHERE h.Inv_Date >= DATEADD(MONTH,-6,GETDATE())
+    GROUP BY c.Cust_Name
+    ORDER BY TotalSales DESC;
+END
+GO
+
+Step 3: VB.NET WinForms (2010)
+
+Open Visual Studio 2010 → New Project → Windows Forms App → Name it TESTANUMONJACOB.
+
+Add Controls to your form (Form1):
+
+Labels + TextBoxes: InvoiceNo, Date, CustomerCode (ComboBox), Customer Name (TextBox, ReadOnly), Address (TextBox, ReadOnly), Total Amount.
+
+DataGridView (dgvDetails) with columns:
+
+Lno (ReadOnly, Auto Number)
+
+Product Code (ComboBox column, bound to Product table)
+
+Description (ReadOnly)
+
+Unit Price (Editable)
+
+Qty (Editable)
+
+Amount (ReadOnly)
+
+Buttons: btnNew, btnModify, btnDelete, btnSave, btnCancel, btnPrint, btnQuery.
+
+Add a connection string in App.config:
+
+<configuration>
+  <connectionStrings>
+    <add name="ConnStr"
+         connectionString="Data Source=YOURSERVER;Initial Catalog=TESTANUMONJACOB;Integrated Security=True"/>
+  </connectionStrings>
+</configuration>
+
+
+Form Code (simplified sample):
+
+Imports System.Data.SqlClient
+
+Public Class Form1
+    Dim con As New SqlConnection(Configuration.ConfigurationManager.ConnectionStrings("ConnStr").ConnectionString)
+    Dim dtProducts As DataTable
+    Dim invNo As Integer
+
+    Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        LoadCustomers()
+        LoadProducts()
+        PrepareNewInvoice()
+    End Sub
+
+    Private Sub LoadCustomers()
+        Dim da As New SqlDataAdapter("SELECT Cust_Code,Cust_Name FROM Customer", con)
+        Dim dt As New DataTable()
+        da.Fill(dt)
+        cboCustomer.DataSource = dt
+        cboCustomer.DisplayMember = "Cust_Name"
+        cboCustomer.ValueMember = "Cust_Code"
+    End Sub
+
+    Private Sub LoadProducts()
+        Dim da As New SqlDataAdapter("SELECT Prod_Code,Prod_Desc,Prod_Price FROM Product", con)
+        dtProducts = New DataTable()
+        da.Fill(dtProducts)
+
+        Dim col As New DataGridViewComboBoxColumn()
+        col.HeaderText = "Product"
+        col.DataPropertyName = "Inv_Prod"
+        col.DataSource = dtProducts
+        col.DisplayMember = "Prod_Desc"
+        col.ValueMember = "Prod_Code"
+        dgvDetails.Columns.Add("Lno", "Lno")
+        dgvDetails.Columns.Add(col)
+        dgvDetails.Columns.Add("Description", "Description")
+        dgvDetails.Columns.Add("UnitPrice", "Unit Price")
+        dgvDetails.Columns.Add("Qty", "Qty")
+        dgvDetails.Columns.Add("Amount", "Amount")
+    End Sub
+
+    Private Sub PrepareNewInvoice()
+        Dim cmd As New SqlCommand("SELECT ISNULL(MAX(Inv_No),0)+1 FROM Inv_Header", con)
+        con.Open()
+        invNo = CInt(cmd.ExecuteScalar())
+        con.Close()
+        txtInvNo.Text = invNo.ToString()
+        txtDate.Text = DateTime.Now.ToShortDateString()
+    End Sub
+
+    Private Sub dgvDetails_CellValueChanged(sender As Object, e As DataGridViewCellEventArgs) Handles dgvDetails.CellValueChanged
+        If e.ColumnIndex = 2 Or e.ColumnIndex = 3 Then
+            Dim qty As Decimal = Convert.ToDecimal(dgvDetails.Rows(e.RowIndex).Cells("Qty").Value)
+            Dim price As Decimal = Convert.ToDecimal(dgvDetails.Rows(e.RowIndex).Cells("UnitPrice").Value)
+            dgvDetails.Rows(e.RowIndex).Cells("Amount").Value = qty * price
+            UpdateTotal()
+        End If
+    End Sub
+
+    Private Sub UpdateTotal()
+        Dim sum As Decimal = 0
+        For Each r As DataGridViewRow In dgvDetails.Rows
+            If Not r.IsNewRow Then
+                sum += Convert.ToDecimal(r.Cells("Amount").Value)
+            End If
+        Next
+        txtTotal.Text = sum.ToString("N2")
+    End Sub
+
+    Private Sub btnSave_Click(sender As Object, e As EventArgs) Handles btnSave.Click
+        con.Open()
+        Dim cmd As New SqlCommand("sp_InsertInvoice", con)
+        cmd.CommandType = CommandType.StoredProcedure
+        cmd.Parameters.AddWithValue("@Inv_No", invNo)
+        cmd.Parameters.AddWithValue("@Inv_Date", txtDate.Text)
+        cmd.Parameters.AddWithValue("@Inv_Cust", cboCustomer.SelectedValue)
+        cmd.ExecuteNonQuery()
+
+        Dim lno As Integer = 1
+        For Each r As DataGridViewRow In dgvDetails.Rows
+            If Not r.IsNewRow Then
+                Dim cmdDet As New SqlCommand("sp_InsertInvoiceDetail", con)
+                cmdDet.CommandType = CommandType.StoredProcedure
+                cmdDet.Parameters.AddWithValue("@Inv_No", invNo)
+                cmdDet.Parameters.AddWithValue("@Inv_Lno", lno)
+                cmdDet.Parameters.AddWithValue("@Inv_Prod", r.Cells("Product").Value)
+                cmdDet.Parameters.AddWithValue("@Inv_Qty", r.Cells("Qty").Value)
+                cmdDet.Parameters.AddWithValue("@Inv_Price", r.Cells("UnitPrice").Value)
+                cmdDet.ExecuteNonQuery()
+                lno += 1
+            End If
+        Next
+        con.Close()
+        MessageBox.Show("Invoice Saved")
+    End Sub
+
+    Private Sub btnQuery_Click(sender As Object, e As EventArgs) Handles btnQuery.Click
+        con.Open()
+        Dim cmd As New SqlCommand("sp_MaxSalesCustomer", con)
+        cmd.CommandType = CommandType.StoredProcedure
+        Dim rdr As SqlDataReader = cmd.ExecuteReader()
+        If rdr.Read() Then
+            MessageBox.Show("Customer: " & rdr("Cust_Name").ToString() &
+                            vbCrLf & "Sales: " & rdr("TotalSales").ToString())
+        End If
+        con.Close()
+    End Sub
+End Class
+
+Step 4: How to Wire It Up
+
+Run the SQL scripts first.
+
+In Visual Studio, create the project TESTANUMONJACOB.
+
+Add the form controls (labels, textboxes, DataGridView, buttons).
+
+Paste the VB.NET code.
+
+Adjust connection string (YOURSERVER).
+
+Run → New → Fill details → Save.
+
+Try Query → shows customer with max sales in last 6 months.
